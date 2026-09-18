@@ -34,9 +34,9 @@ test.describe("Register flow", () => {
 
     await page.goto("/productos", { waitUntil: 'networkidle' });
 
-    // 2. BUSQUEDA FLEXIBLE: Buscamos el texto en cualquier parte del DOM
-    // Si no aparece, el log de consola de arriba nos dirá si hubo un error de JS
-    await expect(page.locator('body')).toContainText(/inventario/i, { timeout: 15000 });
+    // 2. BUSQUEDA FLEXIBLE: Verificamos que el menú cargó con el producto mockeado
+    await expect(page.getByRole("heading", { name: /Nuestro menú/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Mock CI/i)).toBeVisible({ timeout: 15000 });
   });
 
   test("events page shows calendar heading", async ({ page }) => {
