@@ -1,0 +1,171 @@
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import "./Login.css";
+import {
+  login,
+  forgotPassword as sendForgotPassword,
+  getMe,
+} from "../../services/auth.service";
+
+const Login: React.FC = () => {
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // ✅ useCallback garantiza que handleLogin siempre tenga email y password actualizados
+  const handleLogin = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const { data } = await login(email, password);
+      localStorage.setItem("token", data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token);
+      }
+
+      const signInRole =
+        typeof data.rol === "string" ? data.rol.toLowerCase() : null;
+
+      if (signInRole) {
+        localStorage.setItem("rol", signInRole);
+      } else {
+        try {
+          const meResponse = await getMe();
+          const meRole = meResponse.data?.rol;
+          if (typeof meRole === "string") {
+            localStorage.setItem("rol", meRole.toLowerCase());
+          }
+        } catch {
+          localStorage.removeItem("rol");
+        }
+      }
+
+      navigate("/");
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? "Correo o contraseña incorrectos")
+        : "Correo o contraseña incorrectos";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [email, password, navigate]); // 👈 se recrea solo cuando cambian estos valores
+
+  // ✅ useCallback con lógica real de develop
+  const handleForgotPassword = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await sendForgotPassword(forgotEmail);
+      setForgotSent(true);
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? "Error al enviar el correo")
+        : "Error al enviar el correo";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [forgotEmail]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        if (forgotPassword) {
+          handleForgotPassword();
+        } else {
+          handleLogin();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [forgotPassword, handleLogin, handleForgotPassword]);
+
+  return (
+    <div className="base-login">
+      <div className="logo-login">
+        {forgotPassword && (
+          <span className="volver" onClick={() => setForgotPassword(false)}>
+            ← Volver al login
+          </span>
+        )}
+        <img src={"/logo.svg"} alt="SwissHaus" className="auth-logo" />
+      </div>
+
+      {!forgotPassword ? (
+        <div className="form-login">
+          <label className="inicio-sesion">Iniciar sesión</label>
+          <input
+            type="text"
+            placeholder="Correo electrónico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && <span className="error-msg">{error}</span>}
+          <a className="contraseña" onClick={() => setForgotPassword(true)}>
+            ¿Olvidaste tu contraseña?
+          </a>
+          <button className="entrar" onClick={handleLogin} disabled={loading}>
+            {loading ? "Login..." : "Login"}
+          </button>
+          <label className="cuenta">¿No tienes una cuenta?</label>
+          <a href="/register">Regístrate aquí</a>
+        </div>
+      ) : (
+        <div className="form-login">
+          <label className="inicio-sesion">Recuperar Contraseña</label>
+          {forgotSent ? (
+            <label className="instrucciones">
+              Revisa tu correo, te enviamos un enlace para restablecer tu
+              contraseña.
+            </label>
+          ) : (
+            <>
+              <label className="instrucciones">
+                Ingresa tu correo electrónico y te enviaremos un código para
+                restablecer tu contraseña.
+              </label>
+              <input
+                type="text"
+                placeholder="Correo electrónico"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+              />
+              {error && <span className="error-msg">{error}</span>}
+              <div className="botones-login">
+                <button
+                  className="enviar"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                >
+                  {loading ? "Enviando..." : "Enviar Código"}
+                </button>
+                <button
+                  className="cancelar"
+                  onClick={() => setForgotPassword(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Login;
